@@ -7,7 +7,7 @@ data class Fields(
     @SerializedName("Spørsmål")
     val spørsmål: String,
     @SerializedName("Publisert")
-    var publisert: Boolean,
+    var publisert: Boolean = false,
     @SerializedName("Sendt inn")
-    var sendtInn: Date,
+    var sendtInn: Date = Date(),
 )
