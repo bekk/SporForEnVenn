@@ -32,16 +32,22 @@ class Sporforenvenn {
 
         // val user = splitSlackMessage(slackData)["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
         // val responseUrl = splitSlackMessage(slackData)["response_url"]?: throw RuntimeException("Cannot get user from the slash comand")
+        val fromChannel = splitSlackMessage(slackData)["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
+        val testChannel = System.getenv("SLACK_TEST_CHANNEL_ID")
+
+        println(slackData)
 
         GlobalScope.launch {
             val text = splitSlackMessage(slackData)["text"]
 
             if (text != null && text != ""){
                 val channelId = System.getenv("SLACK_CHANNEL_ID")
-                publiserMessageToSlack(text, methods, channelId, context.logger)
+                if(fromChannel === testChannel) {
+                    publiserMessageToSlack(text, methods, fromChannel)
+                }
+                publiserMessageToSlackAndCreate(text, methods, channelId, context.logger)
             }else{
-                val channelId = splitSlackMessage(slackData)["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
-                askWhichMessageToPublish(slackData, methods, channelId, context.logger)
+                askWhichMessageToPublish(slackData, methods, fromChannel, context.logger)
             }
         }
 

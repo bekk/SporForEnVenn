@@ -1,7 +1,6 @@
 package Bekk.no
 
 import Bekk.no.Models.Response.Payload
-import Bekk.no.Models.ResponseUrlBody.Delete
 import com.google.gson.Gson
 import com.microsoft.azure.functions.*
 import com.microsoft.azure.functions.annotation.AuthorizationLevel
@@ -40,9 +39,25 @@ class InteractiveResponse {
 
         checkIfMessageIsFromSlack(request, payload.user.id, context.logger)
 
-        if( payload.actions[0].action_id == "publiser"){
+        if (payload.actions[0].action_id == "publiser") {
             GlobalScope.launch {
-                publiserMessageToSlackAndUpdateAirtables(payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value, payload.response_url, slack, channelId, context.logger)
+                val fromChannel = payload.channel.id
+                val testChannel = System.getenv("SLACK_TEST_CHANNEL_ID")
+
+                if (testChannel === fromChannel)
+                    publiserMessageToSlack(
+                        payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value,
+                        methods,
+                        testChannel,
+                    )
+                else
+                    publiserMessageToSlackAndUpdateAirtables(
+                        payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value,
+                        payload.response_url,
+                        slack,
+                        channelId,
+                        context.logger
+                    )
             }
         }
 

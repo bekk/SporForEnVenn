@@ -1,6 +1,9 @@
 package Bekk.no
 
 // Airtable models
+import Bekk.no.Models.Create.Create
+import Bekk.no.Models.Create.CreateFields
+import Bekk.no.Models.Record
 import Bekk.no.Models.Records
 import Bekk.no.Models.ResponseUrlBody.Delete
 import Bekk.no.Models.UpdateAirtable.Fields
@@ -41,23 +44,32 @@ val BASE: String = "https://api.airtable.com/v0/appcl9RjQFnGDH5H9/Sp%C3%B8r%20fo
 
 val FILTER: String = "filterByFormula=NOT({Publisert})"
 
-suspend fun publiserMessageToSlack( message: String, methods: MethodsClient, channelId: String, logger: Logger) {
-    val decodedMessage = decode(message, "UTF-8")
+fun publiserMessageToSlack( message: String, methods: MethodsClient, channelId: String) {
     methods.chatPostMessage {
         it
             .channel(channelId)
-            .text(decodedMessage)
+            .text(message)
     }
-    // Endre litt så vil dette sende en create til airtables med det publiserte spørsmålet
-//    val update: Records = client.patch<Records>(BASE) {
-//        headers {
-//            append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
-//        }
-//        contentType(ContentType.Application.Json)
-//        body = {
-//            Records(records = listOf(Record(fields = Fields(spørsmål = message))))
-//        }
-//    }
+}
+
+suspend fun publiserMessageToSlackAndCreate( message: String, methods: MethodsClient, channelId: String, logger: Logger) {
+    val decodedMessage = decode(message, "UTF-8")
+    val client = HttpClient(CIO) {
+        install(JsonFeature) {
+            serializer = GsonSerializer()
+        }
+    }
+    val create: Record = client.post(BASE) {
+        headers {
+            append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
+        }
+        contentType(ContentType.Application.Json)
+        body = Create(fields = CreateFields(Spørsmål = decodedMessage))
+    }
+    client.close()
+
+    logger.info("Created $create")
+    publiserMessageToSlack(decodedMessage, methods, channelId)
 }
 
 suspend fun publiserMessageToSlackAndUpdateAirtables(
@@ -73,7 +85,7 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
             serializer = GsonSerializer()
         }
     }
-    val response: Records = client.get<Records>("$BASE?$FILTER") {
+    val response: Records = client.get("$BASE?$FILTER") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -95,7 +107,7 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
             body = recordsToUpdate
         }
 
-        publiserMessageToSlack(message = valueToUpdate.fields.spørsmål, methods, channelId, logger)
+        publiserMessageToSlack(message = valueToUpdate.fields.spørsmål, methods, channelId)
     }
 
     slack.httpClient.postJsonBody(response_url, Delete(true))
