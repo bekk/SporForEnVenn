@@ -28,6 +28,7 @@ class InteractiveResponse {
         val slackData = request.body.get()
         val slack = Slack.getInstance()
         val slackToken = System.getenv("SLACK_TOKEN")
+        val channelId = System.getenv("SLACK_CHANNEL_ID")
         val methods = slack.methods(slackToken)
         // BoilerPlate end
 
@@ -36,13 +37,11 @@ class InteractiveResponse {
         val gson = Gson();
         val payload = gson.fromJson(decodedMessage, Payload::class.java)
 
-        CheckIfMessageIsFromSlack(request, payload.user.id, context.logger)
-
-        context.logger.severe(payload.actions[0].action_id)
+        checkIfMessageIsFromSlack(request, payload.user.id, context.logger)
 
         if( payload.actions[0].action_id == "publiser"){
             GlobalScope.launch {
-                publiserMessageToSlackAndUpdateAirtables(payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value, methods, payload.channel.id, context.logger)
+                publiserMessageToSlackAndUpdateAirtables(payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value, methods, channelId, context.logger)
             }
         }
 

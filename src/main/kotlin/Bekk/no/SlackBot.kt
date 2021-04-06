@@ -25,9 +25,13 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import javax.xml.bind.DatatypeConverter
 
-const val juneID = "U0452UJA1";
-const val jorundAmsenID = "U6HG03FSB";
-val authorizedUsers = listOf(juneID, jorundAmsenID)
+const val juneID = "U0452UJA1"
+const val jorundAmsenID = "U6HG03FSB"
+const val steffenID = "ULX53HFMF"
+const val steffenTestID = "U01EEHXK0GY"
+const val andersID = "UB91B9UJY"
+
+val authorizedUsers = listOf(juneID, jorundAmsenID, steffenID, andersID, steffenTestID)
 
 
 val AIRTABLE_API_KEY: String = "Bearer ${System.getenv("AIR_TABLE")}"
@@ -36,7 +40,7 @@ val BASE: String = "https://api.airtable.com/v0/appcl9RjQFnGDH5H9/Sp%C3%B8r%20fo
 val FILTER: String = "filterByFormula=NOT({Publisert})"
 
 suspend fun publiserMessageToSlack( message: String, methods: MethodsClient, channelId: String, logger: Logger) {
-    val decodedMessage = decode(message, "iso-8859-1")
+    val decodedMessage = decode(message, "UTF-8")
     methods.chatPostMessage {
         it
             .channel(channelId)
@@ -112,7 +116,7 @@ suspend fun askWhichMessageToPublish(slackData: String, methods: MethodsClient, 
 
     records
         .sortedBy { record -> record.fields.sendtInn }
-        .take(5);
+        .take(5)
 
     val noe = methods.chatPostEphemeral() {
             it
@@ -160,7 +164,7 @@ suspend fun askWhichMessageToPublish(slackData: String, methods: MethodsClient, 
     client.close()
 }
 
-fun CheckIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, user: String, logger: Logger){
+fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, user: String, logger: Logger){
     val slackData = request.body.get()
     val slackTimestamp: String = request.headers["x-slack-request-timestamp"]
         ?: throw RuntimeException("Cannot get slackTimeStamp from request")
@@ -169,10 +173,10 @@ fun CheckIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, use
     val slackSigningBaseString = "v0:$slackTimestamp:$slackData"
     matchSignature(slackSigningBaseString, slackSignature, logger)
 
-    // Add auth when needed i guess
-    //    if (!authorizedUsers.contains(user)){
-    //        throw Exception("This user is not Authorized to use the slack bot to publish messages.")
-    //    }
+    println(user)
+    if (!authorizedUsers.contains(user)){
+        throw Exception("This user is not Authorized to use the slack bot to publish messages.")
+    }
 }
 
 fun splitSlackMessage(slackMessage: String): Map<String, String> {

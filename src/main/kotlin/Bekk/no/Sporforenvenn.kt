@@ -22,21 +22,21 @@ class Sporforenvenn {
         // BoilerPlate
         context.logger.info("HTTP trigger processed a ${request.httpMethod.name} request.")
         val slackData = request.body.get()
-        val channelId = System.getenv("SLACK_CHANNEL_ID")
+        val channelId = splitSlackMessage(slackData)["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
+
         val slack = Slack.getInstance()
         val slackToken = System.getenv("SLACK_TOKEN")
         val methods = slack.methods(slackToken)
         val user = splitSlackMessage(slackData)["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
-        CheckIfMessageIsFromSlack(request, user, context.logger)
+        checkIfMessageIsFromSlack(request, user, context.logger)
         // BoilerPlate end
 
         // val user = splitSlackMessage(slackData)["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
         // val responseUrl = splitSlackMessage(slackData)["response_url"]?: throw RuntimeException("Cannot get user from the slash comand")
 
-        // Basically async
         GlobalScope.launch {
             val text = splitSlackMessage(slackData)["text"]
-            println(text)
+
             if (text != null && text != ""){
                 publiserMessageToSlack(text, methods, channelId, context.logger)
             }else{
