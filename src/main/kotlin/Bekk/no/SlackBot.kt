@@ -2,10 +2,12 @@ package Bekk.no
 
 // Airtable models
 import Bekk.no.Models.Records
+import Bekk.no.Models.ResponseUrlBody.Delete
 import Bekk.no.Models.UpdateAirtable.Fields
 import Bekk.no.Models.UpdateAirtable.UpdateRecord
 import Bekk.no.Models.UpdateAirtable.UpdateRecords
 import com.microsoft.azure.functions.HttpRequestMessage
+import com.slack.api.Slack
 
 // Slack
 import com.slack.api.methods.MethodsClient
@@ -60,10 +62,12 @@ suspend fun publiserMessageToSlack( message: String, methods: MethodsClient, cha
 
 suspend fun publiserMessageToSlackAndUpdateAirtables(
     id: String,
-    methods: MethodsClient,
+    response_url: String,
+    slack: Slack,
     channelId: String,
     logger: Logger
 ) {
+    val methods = slack.methods()
     val client = HttpClient(CIO) {
         install(JsonFeature) {
             serializer = GsonSerializer()
@@ -94,6 +98,7 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
         publiserMessageToSlack(message = valueToUpdate.fields.spørsmål, methods, channelId, logger)
     }
 
+    slack.httpClient.postJsonBody(response_url, Delete(true))
     client.close()
 }
 
@@ -155,15 +160,6 @@ suspend fun askWhichMessageToPublish(slackData: String, methods: MethodsClient, 
                     }
                 }
         }
-    if(noe.isOk){
-        methods.chatUpdate(){
-            it
-                    .ts(noe.messageTs)
-                    .channel(channelId)
-                    .text("It was ok")
-        }
-    }
-        logger.info(noe.toString())
     client.close()
 }
 
@@ -176,7 +172,6 @@ fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, use
     val slackSigningBaseString = "v0:$slackTimestamp:$slackData"
     matchSignature(slackSigningBaseString, slackSignature, logger)
 
-    println(user)
     if (!authorizedUsers.contains(user)){
         throw Exception("This user is not Authorized to use the slack bot to publish messages.")
     }

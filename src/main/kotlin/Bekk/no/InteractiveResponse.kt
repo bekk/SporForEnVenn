@@ -1,6 +1,7 @@
 package Bekk.no
 
 import Bekk.no.Models.Response.Payload
+import Bekk.no.Models.ResponseUrlBody.Delete
 import com.google.gson.Gson
 import com.microsoft.azure.functions.*
 import com.microsoft.azure.functions.annotation.AuthorizationLevel
@@ -41,7 +42,7 @@ class InteractiveResponse {
 
         if( payload.actions[0].action_id == "publiser"){
             GlobalScope.launch {
-                publiserMessageToSlackAndUpdateAirtables(payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value, methods, channelId, context.logger)
+                publiserMessageToSlackAndUpdateAirtables(payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value, payload.response_url, slack, channelId, context.logger)
             }
         }
 
