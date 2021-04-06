@@ -1,8 +1,10 @@
 package Bekk.no
 
-import Bekk.no.Models.Response.Payload
+import Bekk.no.Models.InteractiveMessageRequest.Payload
 import com.google.gson.Gson
-import com.microsoft.azure.functions.*
+import com.microsoft.azure.functions.ExecutionContext
+import com.microsoft.azure.functions.HttpMethod
+import com.microsoft.azure.functions.HttpRequestMessage
 import com.microsoft.azure.functions.annotation.AuthorizationLevel
 import com.microsoft.azure.functions.annotation.FunctionName
 import com.microsoft.azure.functions.annotation.HttpTrigger
@@ -21,21 +23,24 @@ class InteractiveResponse {
             authLevel = AuthorizationLevel.ANONYMOUS
         ) request: HttpRequestMessage<Optional<String>>,
         context: ExecutionContext
-    ): HttpResponseMessage {
+    ) {
 
         // BoilerPlate
         context.logger.info("HTTP trigger processed a ${request.httpMethod.name} request.")
-        val slackData = request.body.get()
         val slack = Slack.getInstance()
-        val slackToken = System.getenv("SLACK_TOKEN")
+        val slackData = splitSlackMessage(URLDecoder.decode(request.body.get(), "Utf-8"))
+
         val channelId = System.getenv("SLACK_CHANNEL_ID")
+        val slackToken = System.getenv("SLACK_TOKEN")
         val methods = slack.methods(slackToken)
         // BoilerPlate end
 
-        val raw = URLDecoder.decode(slackData, "Utf-8")
-        val decodedMessage = splitSlackMessage(raw)["payload"]
+        val decodedMessage = slackData["payload"]
         val gson = Gson();
         val payload = gson.fromJson(decodedMessage, Payload::class.java)
+
+        // ack
+        slack.httpClient.postJsonBody(payload.response_url, null)
 
         checkIfMessageIsFromSlack(request, payload.user.id, context.logger)
 
@@ -54,15 +59,12 @@ class InteractiveResponse {
                     publiserMessageToSlackAndUpdateAirtables(
                         payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value,
                         payload.response_url,
-                        slack,
+                        methods,
+                        slack.httpClient,
                         channelId,
                         context.logger
                     )
             }
         }
-
-        return request
-            .createResponseBuilder(HttpStatus.ACCEPTED)
-            .build()
     }
 }

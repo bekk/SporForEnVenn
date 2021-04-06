@@ -1,20 +1,14 @@
 package Bekk.no
 
 // Airtable models
-import Bekk.no.Models.Create.Create
-import Bekk.no.Models.Create.CreateFields
-import Bekk.no.Models.Record
-import Bekk.no.Models.Records
+import Bekk.no.Models.Airtable.Get.Records
 import Bekk.no.Models.ResponseUrlBody.Delete
-import Bekk.no.Models.UpdateAirtable.Fields
-import Bekk.no.Models.UpdateAirtable.UpdateRecord
-import Bekk.no.Models.UpdateAirtable.UpdateRecords
 import com.microsoft.azure.functions.HttpRequestMessage
-import com.slack.api.Slack
 
 // Slack
 import com.slack.api.methods.MethodsClient
 import com.slack.api.methods.kotlin_extension.request.chat.blocks
+import com.slack.api.util.http.SlackHttpClient
 
 // ktor
 import io.ktor.client.*
@@ -23,7 +17,6 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import io.ktor.features.*
 import io.ktor.http.*
-import java.net.URLDecoder.decode
 import java.util.*
 import java.util.logging.Logger
 import javax.crypto.Mac
@@ -40,11 +33,11 @@ val authorizedUsers = listOf(juneID, jorundAmsenID, steffenID, andersID, steffen
 
 
 val AIRTABLE_API_KEY: String = "Bearer ${System.getenv("AIR_TABLE")}"
-val BASE: String = "https://api.airtable.com/v0/appcl9RjQFnGDH5H9/Sp%C3%B8r%20for%20en%20venn"
+const val BASE: String = "https://api.airtable.com/v0/appcl9RjQFnGDH5H9/Sp%C3%B8r%20for%20en%20venn"
 
-val FILTER: String = "filterByFormula=NOT({Publisert})"
+const val FILTER: String = "filterByFormula=NOT({Publisert})"
 
-fun publiserMessageToSlack( message: String, methods: MethodsClient, channelId: String) {
+fun publiserMessageToSlack(message: String, methods: MethodsClient, channelId: String) {
     methods.chatPostMessage {
         it
             .channel(channelId)
@@ -52,34 +45,41 @@ fun publiserMessageToSlack( message: String, methods: MethodsClient, channelId: 
     }
 }
 
-suspend fun publiserMessageToSlackAndCreate( message: String, methods: MethodsClient, channelId: String, logger: Logger) {
-    val decodedMessage = decode(message, "UTF-8")
+suspend fun publiserMessageToSlackAndCreate(
+    message: String,
+    methods: MethodsClient,
+    channelId: String,
+    logger: Logger
+) {
     val client = HttpClient(CIO) {
         install(JsonFeature) {
             serializer = GsonSerializer()
         }
     }
-    val create: Record = client.post(BASE) {
+    val nyRecord =
+        Bekk.no.Models.Airtable.Create.Record(fields = Bekk.no.Models.Airtable.Create.Fields(sporsmal = message))
+
+    val create: Bekk.no.Models.Airtable.Create.Record = client.post(BASE) {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
         contentType(ContentType.Application.Json)
-        body = Create(fields = CreateFields(Spørsmål = decodedMessage))
+        body = nyRecord
     }
     client.close()
 
     logger.info("Created $create")
-    publiserMessageToSlack(decodedMessage, methods, channelId)
+    publiserMessageToSlack(message, methods, channelId)
 }
 
 suspend fun publiserMessageToSlackAndUpdateAirtables(
     id: String,
     response_url: String,
-    slack: Slack,
+    methods: MethodsClient,
+    httpClient: SlackHttpClient,
     channelId: String,
     logger: Logger
 ) {
-    val methods = slack.methods()
     val client = HttpClient(CIO) {
         install(JsonFeature) {
             serializer = GsonSerializer()
@@ -96,32 +96,35 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
         it.id == id
     } ?: throw NotFoundException("Kunne ikke finne spørsmålet i airtables")
 
-    if(!valueToUpdate.fields.publisert) {
-        val recordsToUpdate: UpdateRecords = UpdateRecords(listOf(UpdateRecord(Fields(true, valueToUpdate.fields.spørsmål), id = valueToUpdate.id)))
+    if (!valueToUpdate.fields.publisert) {
+        val updatedRecord = Bekk.no.Models.Airtable.Update.Record(
+            fields = Bekk.no.Models.Airtable.Update.Fields(
+                valueToUpdate.fields.sporsmal
+            )
+        )
 
-        client.patch<UpdateRecords>(BASE) {
+        client.patch<Bekk.no.Models.Airtable.Update.Record>("$BASE/${valueToUpdate.id}") {
             headers {
                 append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
             }
             contentType(ContentType.Application.Json)
-            body = recordsToUpdate
+            body = updatedRecord
         }
-
-        publiserMessageToSlack(message = valueToUpdate.fields.spørsmål, methods, channelId)
+        logger.info("Publiserer melidingen: ${valueToUpdate.fields.sporsmal} to channel with id: $channelId")
+        publiserMessageToSlack(message = valueToUpdate.fields.sporsmal, methods, channelId)
     }
 
-    slack.httpClient.postJsonBody(response_url, Delete(true))
+    httpClient.postJsonBody(response_url, Delete(true))
     client.close()
 }
 
-suspend fun askWhichMessageToPublish(slackData: String, methods: MethodsClient, channelId: String, logger: Logger) {
+suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, channelId: String) {
     val client = HttpClient(CIO) {
         install(JsonFeature) {
             serializer = GsonSerializer()
         }
     }
-    val user = splitSlackMessage(slackData)["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
-    val response: Records = client.get<Records>("$BASE?$FILTER") {
+    val response: Records = client.get("$BASE?$FILTER") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -129,53 +132,46 @@ suspend fun askWhichMessageToPublish(slackData: String, methods: MethodsClient, 
 
     val records = response.records
 
-    records
+    val sortedRecords = records
         .sortedBy { record -> record.fields.sendtInn }
-        .take(5)
 
-    val noe = methods.chatPostEphemeral() {
-            it
-                .channel(
-                    if(!channelId.startsWith("C"))
-                        user
-                    else
-                        channelId
-                )
-                .user(user)
-                .blocks {
-                    section {
-                        plainText("Work in progress")
-                    }
-                    header {
-                        text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
-                    }
-                    actions {
-                        blockId("actions")
-                        radioButtons {
-                            options {
-                                records.map { record ->
-                                    option {
-                                        plainText(text = record.fields.spørsmål)
-                                        value(record.id)
-                                    }
-
+    methods.chatPostEphemeral {
+        it
+            .channel(channelId)
+            .user(user)
+            .blocks {
+                section {
+                    plainText("Work in progress")
+                }
+                header {
+                    text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
+                }
+                actions {
+                    blockId("actions")
+                    radioButtons {
+                        options {
+                            sortedRecords.map { record ->
+                                option {
+                                    plainText(text = record.fields.sporsmal)
+                                    value(record.id)
                                 }
                             }
-                            actionId("VelgHvaSomSkalPubliseres")
                         }
-                        button {
-                            text("Publiser")
-                            style("primary")
-                            value("publiser")
-                            actionId("publiser")
-                        }
+                        actionId("VelgHvaSomSkalPubliseres")
+                    }
+                    button {
+                        text("Publiser")
+                        style("primary")
+                        value("publiser")
+                        actionId("publiser")
                     }
                 }
-        }
+            }
+    }
     client.close()
 }
 
-fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, user: String, logger: Logger){
+fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, user: String, logger: Logger) {
     val slackData = request.body.get()
     val slackTimestamp: String = request.headers["x-slack-request-timestamp"]
         ?: throw RuntimeException("Cannot get slackTimeStamp from request")
@@ -184,7 +180,7 @@ fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, use
     val slackSigningBaseString = "v0:$slackTimestamp:$slackData"
     matchSignature(slackSigningBaseString, slackSignature, logger)
 
-    if (!authorizedUsers.contains(user)){
+    if (!authorizedUsers.contains(user)) {
         throw Exception("This user is not Authorized to use the slack bot to publish messages.")
     }
 }

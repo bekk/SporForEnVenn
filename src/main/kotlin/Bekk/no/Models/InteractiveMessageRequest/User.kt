@@ -1,4 +1,4 @@
-package Bekk.no.Models.Response
+package Bekk.no.Models.InteractiveMessageRequest
 
 data class User(
     val id: String,
