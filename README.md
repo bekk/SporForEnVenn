@@ -23,6 +23,10 @@ urlen som er mulig å nå utenfor ditt lokale nettverk.
 
 `mvn azure-functions:run`
 
+### Deploy
+
+Automatisk deploy når man pusher til main branch 🎉
+
 ### Tips
 
 For å kjøre denne applikasjonen så trenger du ngruk for å eksponere din localhost ut til slack. Den ligger bare som en
