@@ -22,7 +22,6 @@ class Sporforenvenn {
         // BoilerPlate
         context.logger.info("HTTP trigger processed a ${request.httpMethod.name} request.")
         val slackData = request.body.get()
-        val channelId = splitSlackMessage(slackData)["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
 
         val slack = Slack.getInstance()
         val slackToken = System.getenv("SLACK_TOKEN")
@@ -38,8 +37,10 @@ class Sporforenvenn {
             val text = splitSlackMessage(slackData)["text"]
 
             if (text != null && text != ""){
+                val channelId = System.getenv("SLACK_CHANNEL_ID")
                 publiserMessageToSlack(text, methods, channelId, context.logger)
             }else{
+                val channelId = splitSlackMessage(slackData)["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
                 askWhichMessageToPublish(slackData, methods, channelId, context.logger)
             }
         }

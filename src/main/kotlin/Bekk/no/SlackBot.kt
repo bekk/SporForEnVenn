@@ -91,8 +91,6 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
             body = recordsToUpdate
         }
 
-
-
         publiserMessageToSlack(message = valueToUpdate.fields.spørsmål, methods, channelId, logger)
     }
 
@@ -120,7 +118,12 @@ suspend fun askWhichMessageToPublish(slackData: String, methods: MethodsClient, 
 
     val noe = methods.chatPostEphemeral() {
             it
-                .channel(channelId)
+                .channel(
+                    if(!channelId.startsWith("C"))
+                        user
+                    else
+                        channelId
+                )
                 .user(user)
                 .blocks {
                     section {
