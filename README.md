@@ -24,7 +24,7 @@ For å kjøre denne applikasjonen så trenger du ngruk for å eksponere din loca
 Den ligger bare som en proxy og sender http kall videre til din applikasjon.
 Jeg har satt det opp slik at functions serves på localhost:3000. 
 Dette kan du endre i `local.settings.json`
-```json
+```json5
 {
   "IsEncrypted": false,
   "Values": {
