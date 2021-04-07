@@ -73,6 +73,29 @@ suspend fun publiserMessageToSlackAndCreate(
     publiserMessageToSlack(message, methods, channelId)
 }
 
+suspend fun publiserMessageToSlackFromAirtables(
+    id: String,
+    response_url: String,
+    methods: MethodsClient,
+    httpClient: SlackHttpClient,
+    channelId: String,
+) {
+    val client = HttpClient(CIO) {
+        install(JsonFeature) {
+            serializer = GsonSerializer()
+        }
+    }
+    val record: Bekk.no.Models.Airtable.Get.Record = client.get("$BASE/$id") {
+        headers {
+            append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
+        }
+    }
+
+    publiserMessageToSlack(message = record.fields.sporsmal, methods, channelId)
+
+    httpClient.postJsonBody(response_url, Delete(true))
+    client.close()
+}
 suspend fun publiserMessageToSlackAndUpdateAirtables(
     id: String,
     response_url: String,
