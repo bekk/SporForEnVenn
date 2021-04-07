@@ -39,10 +39,16 @@ const val BASE: String = "https://api.airtable.com/v0/appcl9RjQFnGDH5H9/Sp%C3%B8
 const val FILTER: String = "filterByFormula=NOT({Publisert})"
 
 fun publiserMessageToSlack(message: String, methods: MethodsClient, channelId: String) {
+
     methods.chatPostMessage {
         it
             .channel(channelId)
-            .text(message)
+            .blocks {
+                header {
+                    text(message)
+                }
+                divider()
+            }
     }
 }
 
