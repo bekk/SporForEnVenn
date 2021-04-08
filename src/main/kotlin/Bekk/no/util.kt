@@ -17,6 +17,7 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import io.ktor.features.*
 import io.ktor.http.*
+import java.net.URLEncoder
 import java.util.*
 import java.util.logging.Logger
 import javax.crypto.Mac
@@ -44,8 +45,8 @@ fun publiserMessageToSlack(message: String, methods: MethodsClient, channelId: S
         it
             .channel(channelId)
             .blocks {
-                header {
-                    text(message)
+                section {
+                    markdownText("*$message*")
                 }
                 divider()
             }
@@ -164,15 +165,15 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
 
     val sortedRecords = records
         .sortedBy { record -> record.fields.sendtInn }
+        .reversed()
+        .take(5)
 
     methods.chatPostEphemeral {
         it
             .channel(channelId)
             .user(user)
+            .text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
             .blocks {
-                section {
-                    plainText("Work in progress")
-                }
                 header {
                     text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
                 }
@@ -180,9 +181,9 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
                     blockId("actions")
                     radioButtons {
                         options {
-                            sortedRecords.map { record ->
+                            sortedRecords.mapNotNull { record ->
                                 option {
-                                    plainText(text = record.fields.sporsmal)
+                                    plainText(text = record.fields.sporsmal.take(150))
                                     value(record.id)
                                 }
                             }

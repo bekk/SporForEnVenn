@@ -42,6 +42,11 @@ class Sporforenvenn {
         val fromChannelId =
             slackData["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
         val testChannelId = System.getenv("SLACK_TEST_CHANNEL_ID")
+        println(testChannelId)
+        println(slackToken)
+        println(user)
+        println(fromChannelId)
+        println(slackData)
         GlobalScope.launch {
             val text = slackData["text"]
             if (text != null && text != "") {
