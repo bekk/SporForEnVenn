@@ -160,6 +160,7 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
 
     val sortedRecords = records
         .sortedBy { record -> record.fields.sendtInn }
+        .take(10)
 
     methods.chatPostEphemeral {
         it
