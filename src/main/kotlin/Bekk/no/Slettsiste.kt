@@ -1,6 +1,5 @@
 package Bekk.no
 
-import com.google.gson.Gson
 import com.microsoft.azure.functions.ExecutionContext
 import com.microsoft.azure.functions.HttpMethod
 import com.microsoft.azure.functions.HttpRequestMessage
@@ -11,8 +10,8 @@ import com.slack.api.Slack
 import java.net.URLDecoder
 import java.util.*
 
-class Delete {
-    @FunctionName("slettsiste")
+class Slettsiste {
+    @FunctionName("${PREFIX}slettsiste")
     fun run(
         @HttpTrigger(
             name = "req",
@@ -35,6 +34,7 @@ class Delete {
             it
                 .token(slackToken)
         }
+
         val user = slackData["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
         checkIfMessageIsFromSlack(request, user, context.logger)
         // BoilerPlate end

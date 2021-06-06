@@ -8,6 +8,8 @@ import com.microsoft.azure.functions.HttpRequestMessage
 // Slack
 import com.slack.api.methods.MethodsClient
 import com.slack.api.methods.kotlin_extension.request.chat.blocks
+import com.slack.api.model.block.LayoutBlock
+import com.slack.api.model.kotlin_extension.block.withBlocks
 import com.slack.api.util.http.SlackHttpClient
 
 // ktor
@@ -17,39 +19,31 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import io.ktor.features.*
 import io.ktor.http.*
-import java.net.URLEncoder
 import java.util.*
 import java.util.logging.Logger
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import javax.xml.bind.DatatypeConverter
 
-const val juneID = "U0452UJA1"
-const val jorundAmsenID = "U6HG03FSB"
-const val steffenID = "ULX53HFMF"
-const val steffenTestID = "U01EEHXK0GY"
-const val andersID = "UB91B9UJY"
-const val espenID = "U02HEARQ0"
 
-val authorizedUsers = listOf(juneID, jorundAmsenID, steffenID, andersID, steffenTestID, espenID)
-
-
-val AIRTABLE_API_KEY: String = "Bearer ${System.getenv("AIR_TABLE")}"
-const val BASE: String = "https://api.airtable.com/v0/appcl9RjQFnGDH5H9/Sp%C3%B8r%20for%20en%20venn"
 
 const val FILTER: String = "filterByFormula=NOT({Publisert})"
 
-fun publiserMessageToSlack(message: String, methods: MethodsClient, channelId: String) {
+fun createMessage(message: String): List<LayoutBlock> {
+    return withBlocks {
+        section {
+            markdownText("*$message*")
+        }
+        divider()
+    }
+}
 
+fun publiserMessageToSlack(message: String, methods: MethodsClient, channelId: String) {
     methods.chatPostMessage {
         it
             .channel(channelId)
-            .blocks {
-                section {
-                    markdownText("*$message*")
-                }
-                divider()
-            }
+            .text(message)
+            .blocks(createMessage(message))
     }
 }
 
@@ -67,7 +61,7 @@ suspend fun publiserMessageToSlackAndCreate(
     val nyRecord =
         Bekk.no.Models.Airtable.Create.Record(fields = Bekk.no.Models.Airtable.Create.Fields(sporsmal = message))
 
-    val create: Bekk.no.Models.Airtable.Create.Record = client.post(BASE) {
+    val create: Bekk.no.Models.Airtable.Create.Record = client.post(AIRTABLE_BASE) {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -92,7 +86,7 @@ suspend fun publiserMessageToSlackFromAirtables(
             serializer = GsonSerializer()
         }
     }
-    val record: Bekk.no.Models.Airtable.Get.Record = client.get("$BASE/$id") {
+    val record: Bekk.no.Models.Airtable.Get.Record = client.get("$AIRTABLE_BASE/$id") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -116,7 +110,7 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
             serializer = GsonSerializer()
         }
     }
-    val response: Records = client.get("$BASE?$FILTER") {
+    val response: Records = client.get("$AIRTABLE_BASE?$FILTER") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -134,7 +128,7 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
             )
         )
 
-        client.patch<Bekk.no.Models.Airtable.Update.Record>("$BASE/${valueToUpdate.id}") {
+        client.patch<Bekk.no.Models.Airtable.Update.Record>("$AIRTABLE_BASE/${valueToUpdate.id}") {
             headers {
                 append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
             }
@@ -155,7 +149,8 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
             serializer = GsonSerializer()
         }
     }
-    val response: Records = client.get("$BASE?$FILTER") {
+
+    val response: Records = client.get("$AIRTABLE_BASE?$FILTER") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -165,8 +160,6 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
 
     val sortedRecords = records
         .sortedBy { record -> record.fields.sendtInn }
-        .reversed()
-        .take(5)
 
     methods.chatPostEphemeral {
         it
