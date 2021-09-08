@@ -26,8 +26,8 @@ import javax.crypto.spec.SecretKeySpec
 import javax.xml.bind.DatatypeConverter
 
 
+const val FILTER: String = "filterByFormula=AND(NOT({Publisert}), NOT({BlirIkkePublisert}))"
 
-const val FILTER: String = "filterByFormula=NOT({Publisert})"
 
 fun createMessage(message: String): List<LayoutBlock> {
     return withBlocks {

@@ -8,6 +8,8 @@ data class Fields(
     val sporsmal: String,
     @SerializedName("Publisert")
     var publisert: Boolean = true,
+    @SerializedName("BlirIkkePublisert")
+    var blirIkkePublisert: Boolean = true,
     @SerializedName("Sendt inn")
     val sendtInn: Date = Date()
 )
