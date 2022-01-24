@@ -2,6 +2,7 @@ package Bekk.no
 
 // Airtable models
 import Bekk.no.Models.Airtable.Get.Records
+import Bekk.no.Models.Airtable.Users.UserRecords
 import Bekk.no.Models.ResponseUrlBody.Delete
 import com.microsoft.azure.functions.HttpRequestMessage
 
@@ -26,8 +27,9 @@ import javax.crypto.spec.SecretKeySpec
 import javax.xml.bind.DatatypeConverter
 
 
-const val FILTER: String = "filterByFormula=AND(NOT({Publisert}), NOT({BlirIkkePublisert}))"
 
+const val FILTER: String = "filterByFormula=NOT({Publisert})"
+const val userFilter: String = "filterByFormula={Active}"
 
 fun createMessage(message: String): List<LayoutBlock> {
     return withBlocks {
@@ -61,7 +63,7 @@ suspend fun publiserMessageToSlackAndCreate(
     val nyRecord =
         Bekk.no.Models.Airtable.Create.Record(fields = Bekk.no.Models.Airtable.Create.Fields(sporsmal = message))
 
-    val create: Bekk.no.Models.Airtable.Create.Record = client.post(AIRTABLE_BASE) {
+    val create: Bekk.no.Models.Airtable.Create.Record = client.post(AIRTABLE_DATA_TABLE) {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -86,7 +88,7 @@ suspend fun publiserMessageToSlackFromAirtables(
             serializer = GsonSerializer()
         }
     }
-    val record: Bekk.no.Models.Airtable.Get.Record = client.get("$AIRTABLE_BASE/$id") {
+    val record: Bekk.no.Models.Airtable.Get.Record = client.get("$AIRTABLE_DATA_TABLE/$id") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -110,7 +112,7 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
             serializer = GsonSerializer()
         }
     }
-    val response: Records = client.get("$AIRTABLE_BASE?$FILTER") {
+    val response: Records = client.get("$AIRTABLE_DATA_TABLE?$FILTER") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -128,7 +130,7 @@ suspend fun publiserMessageToSlackAndUpdateAirtables(
             )
         )
 
-        client.patch<Bekk.no.Models.Airtable.Update.Record>("$AIRTABLE_BASE/${valueToUpdate.id}") {
+        client.patch<Bekk.no.Models.Airtable.Update.Record>("$AIRTABLE_DATA_TABLE/${valueToUpdate.id}") {
             headers {
                 append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
             }
@@ -150,7 +152,7 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
         }
     }
 
-    val response: Records = client.get("$AIRTABLE_BASE?$FILTER") {
+    val response: Records = client.get("$AIRTABLE_DATA_TABLE?$FILTER") {
         headers {
             append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
         }
@@ -166,10 +168,10 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
         it
             .channel(channelId)
             .user(user)
-            .text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
+            .text("Hvilken melding vil du sende til kanalen 'Barelureraltså'?")
             .blocks {
                 header {
-                    text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
+                    text("Hvilken melding vil du sende til kanalen 'Barelureraltså'?")
                 }
                 actions {
                     blockId("actions")
@@ -196,7 +198,7 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
     client.close()
 }
 
-fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, user: String, logger: Logger) {
+suspend fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, user: String, logger: Logger) {
     val slackData = request.body.get()
     val slackTimestamp: String = request.headers["x-slack-request-timestamp"]
         ?: throw RuntimeException("Cannot get slackTimeStamp from request")
@@ -205,8 +207,23 @@ fun checkIfMessageIsFromSlack(request: HttpRequestMessage<Optional<String>>, use
     val slackSigningBaseString = "v0:$slackTimestamp:$slackData"
     matchSignature(slackSigningBaseString, slackSignature, logger)
 
-    if (!authorizedUsers.contains(user)) {
-        throw Exception("This user is not Authorized to use the slack bot to publish messages.")
+    val client = HttpClient(CIO) {
+        install(JsonFeature) {
+            serializer = GsonSerializer()
+        }
+    }
+
+    val userRecords: UserRecords = client.get("$AIRTABLE_USER_TABLE?$userFilter") {
+        headers {
+            append(HttpHeaders.Authorization, AIRTABLE_API_KEY)
+        }
+    }
+
+    val users = userRecords.records.map { it.fields.userId }
+    val isUserInActiveUserList = users.contains(user)
+
+    if (!isUserInActiveUserList) {
+        throw Exception("This user is not Authorized to use the slack bot to publish messages. $users $user")
     }
 }
 
@@ -217,7 +234,6 @@ fun splitSlackMessage(slackMessage: String): Map<String, String> {
         )[0] to it.split("=")[1]
     }.toMap()
 }
-
 
 //https://api.slack.com/docs/verifying-requests-from-slack#a_recipe_for_security
 fun matchSignature(slackSigningBaseString: String, slackSignature: String, logger: Logger) {

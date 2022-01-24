@@ -7,6 +7,8 @@ import com.microsoft.azure.functions.annotation.AuthorizationLevel
 import com.microsoft.azure.functions.annotation.FunctionName
 import com.microsoft.azure.functions.annotation.HttpTrigger
 import com.slack.api.Slack
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.util.*
 
@@ -36,21 +38,24 @@ class Slettsiste {
         }
 
         val user = slackData["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
-        checkIfMessageIsFromSlack(request, user, context.logger)
-        // BoilerPlate end
 
-        val fromChannelId =
-            slackData["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
+        GlobalScope.launch {
+            checkIfMessageIsFromSlack(request, user, context.logger)
+            // BoilerPlate end
 
-        val response = methods.conversationsHistory {
-            it
-                .channel(fromChannelId)
-        }
-        val messageToBeDeleted = response.messages.first { it.botId == auth.botId };
-        methods.chatDelete {
-            it
-                .channel(fromChannelId)
-                .ts(messageToBeDeleted.ts)
+            val fromChannelId =
+                    slackData["channel_id"] ?: throw RuntimeException("Cannot get channel id from the slash comand")
+
+            val response = methods.conversationsHistory {
+                it
+                        .channel(fromChannelId)
+            }
+            val messageToBeDeleted = response.messages.first { it.botId == auth.botId };
+            methods.chatDelete {
+                it
+                        .channel(fromChannelId)
+                        .ts(messageToBeDeleted.ts)
+            }
         }
     }
 }

@@ -34,8 +34,6 @@ class Sporforenvenn {
         val slackToken = System.getenv("SLACK_TOKEN")
         val methods = slack.methods(slackToken)
         val user = slackData["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
-        checkIfMessageIsFromSlack(request, user, context.logger)
-        // BoilerPlate end
 
         // val user = splitSlackMessage(slackData)["user_id"] ?: throw RuntimeException("Cannot get user from the slash comand")
         // val responseUrl = splitSlackMessage(slackData)["response_url"]?: throw RuntimeException("Cannot get user from the slash comand")
@@ -44,6 +42,7 @@ class Sporforenvenn {
         val testChannelId = System.getenv("SLACK_TEST_CHANNEL_ID")
 
         GlobalScope.launch {
+            checkIfMessageIsFromSlack(request, user, context.logger)
             val text = slackData["text"]
             if (text != null && text != "") {
                 if (fromChannelId == testChannelId.toString()) {

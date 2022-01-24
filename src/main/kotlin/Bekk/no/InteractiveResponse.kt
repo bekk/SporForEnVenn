@@ -42,13 +42,13 @@ class InteractiveResponse {
         // ack
         slack.httpClient.postJsonBody(payload.response_url, null)
 
-        checkIfMessageIsFromSlack(request, payload.user.id, context.logger)
 
         val fromChannelId = payload.channel.id
         val testChannelId = System.getenv("SLACK_TEST_CHANNEL_ID")
 
         if (payload.actions[0].action_id == "publiser") {
             GlobalScope.launch {
+                checkIfMessageIsFromSlack(request, payload.user.id, context.logger)
                 if (testChannelId.toString() == fromChannelId)
                     publiserMessageToSlackFromAirtables(
                         payload.state.values.actions.VelgHvaSomSkalPubliseres.selected_option.value,
