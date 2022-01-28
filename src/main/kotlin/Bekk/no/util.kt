@@ -27,8 +27,7 @@ import javax.crypto.spec.SecretKeySpec
 import javax.xml.bind.DatatypeConverter
 
 
-
-const val FILTER: String = "filterByFormula=NOT({Publisert})"
+const val FILTER: String = "filterByFormula=AND(NOT({Publisert}), NOT({BlirIkkePublisert}))"
 const val userFilter: String = "filterByFormula={Active}"
 
 fun createMessage(message: String): List<LayoutBlock> {
@@ -168,10 +167,10 @@ suspend fun askWhichMessageToPublish(user: String, methods: MethodsClient, chann
         it
             .channel(channelId)
             .user(user)
-            .text("Hvilken melding vil du sende til kanalen 'Barelureraltså'?")
+            .text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
             .blocks {
                 header {
-                    text("Hvilken melding vil du sende til kanalen 'Barelureraltså'?")
+                    text("Hvilken melding vil du sende til kanalen 'Spør for en venn'?")
                 }
                 actions {
                     blockId("actions")
